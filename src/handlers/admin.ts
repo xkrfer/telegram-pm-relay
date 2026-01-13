@@ -26,6 +26,7 @@ import {
   getRateLimitConfig,
 } from "../services/ratelimit.service";
 import { configService } from "../services/config.service";
+import { filterService } from "../services/filter.service";
 import {
   getVerificationStatus,
   createVerificationLink,
@@ -56,7 +57,7 @@ export async function handleAdminMessage(
       env.ADMIN_UID.toString()
     );
     await sendMessage(api, chatId, welcomeMsg, env);
-    
+
     // Set admin command menu
     try {
       await api.setMyCommands(
@@ -65,13 +66,15 @@ export async function handleAdminMessage(
           { command: "stats", description: m.admin.menuStats },
           { command: "banlist", description: m.admin.menuBanlist },
           { command: "verification", description: m.admin.menuVerification },
+          { command: "filter", description: m.admin.menuFilter },
+          { command: "setting", description: m.admin.menuSetting },
         ],
         { scope: { type: "chat", chat_id: chatId } }
       );
     } catch (error) {
       console.error("[AdminHandler]", "Failed to set menu", error);
     }
-    
+
     return;
   }
 
@@ -180,7 +183,9 @@ export async function handleAdminMessage(
       let msg = m.admin.banlistTitle(banList.length);
       banList.slice(0, 20).forEach((item, i) => {
         const expires = item.expiresAt
-          ? `\n   ${m.misc.expiresAt}: ${new Date(item.expiresAt * 1000).toLocaleString(lang === 'zh' ? 'zh-CN' : 'en-US')}`
+          ? `\n   ${m.misc.expiresAt}: ${new Date(
+              item.expiresAt * 1000
+            ).toLocaleString(lang === "zh" ? "zh-CN" : "en-US")}`
           : "";
         msg += `${i + 1}. ${item.telegramId}\n   ${m.misc.reason}: ${
           item.reason || m.misc.notSpecified
@@ -229,7 +234,10 @@ export async function handleAdminMessage(
 
       const result = await importBanList(db, csvContent, chatId, lang);
 
-      let resultMsg = m.admin.importSuccess(result.imported, result.errors.length);
+      let resultMsg = m.admin.importSuccess(
+        result.imported,
+        result.errors.length
+      );
       if (result.errors.length > 0) {
         resultMsg += m.admin.importErrors(result.errors);
       }
@@ -238,6 +246,290 @@ export async function handleAdminMessage(
     } catch (error) {
       console.error("[AdminHandler]", "Failed to import ban list", error);
       await sendMessage(api, chatId, m.admin.importFailed, env);
+    }
+    return;
+  }
+
+  // /setting view - View global settings
+  if (text === "/setting view") {
+    try {
+      const generalConfig = await configService.getGeneralConfig(db, env);
+
+      let settingsMsg = m.admin.settingViewTitle;
+      settingsMsg += m.admin.settingAllowedTypes(
+        generalConfig.allowedTypes.join(", ")
+      );
+      settingsMsg += m.admin.settingEditNotification(
+        generalConfig.editNotificationEnabled
+      );
+
+      await sendMessage(api, chatId, settingsMsg, env);
+    } catch (error) {
+      console.error("[AdminHandler]", "Failed to get settings", error);
+      await sendMessage(api, chatId, "❌ 获取配置失败", env);
+    }
+    return;
+  }
+
+  // /setting types <type1,type2,...> - Set allowed message types
+  if (text.startsWith("/setting types ")) {
+    const typesStr = text.substring(15).trim();
+    const types = typesStr
+      .split(",")
+      .map((t: string) => t.trim())
+      .filter((t: string) => t);
+
+    if (types.length === 0) {
+      await sendMessage(api, chatId, m.admin.settingTypesInvalid, env);
+      return;
+    }
+
+    try {
+      const result = await configService.setAllowedTypes(
+        db,
+        env,
+        types,
+        chatId
+      );
+
+      if (result.success) {
+        await sendMessage(
+          api,
+          chatId,
+          m.admin.settingTypesSet(types.join(", ")),
+          env
+        );
+      } else {
+        await sendMessage(api, chatId, `❌ ${result.error}`, env);
+      }
+    } catch (error) {
+      console.error("[AdminHandler]", "Failed to set allowed types", error);
+      await sendMessage(api, chatId, "❌ 设置失败", env);
+    }
+    return;
+  }
+
+  // /setting edit <on|off> - Toggle edit notification
+  if (text.startsWith("/setting edit ")) {
+    const action = text.substring(14).trim().toLowerCase();
+
+    if (action !== "on" && action !== "off") {
+      await sendMessage(api, chatId, m.admin.settingEditInvalid, env);
+      return;
+    }
+
+    const enabled = action === "on";
+
+    try {
+      const result = await configService.setEditNotification(
+        db,
+        env,
+        enabled,
+        chatId
+      );
+
+      if (result.success) {
+        await sendMessage(api, chatId, m.admin.settingEditSet(enabled), env);
+      } else {
+        await sendMessage(api, chatId, `❌ ${result.error}`, env);
+      }
+    } catch (error) {
+      console.error("[AdminHandler]", "Failed to set edit notification", error);
+      await sendMessage(api, chatId, "❌ 设置失败", env);
+    }
+    return;
+  }
+
+  // /filter list - List all filter rules
+  if (text === "/filter list") {
+    try {
+      const filters = await filterService.getAllFilters(db);
+
+      if (filters.length === 0) {
+        await sendMessage(api, chatId, m.admin.filterListEmpty, env);
+        return;
+      }
+
+      let msg = m.admin.filterListTitle(filters.length);
+      filters.forEach((filter) => {
+        msg += m.admin.filterListItem(
+          filter.id,
+          filter.priority,
+          filter.mode,
+          filter.regex,
+          filter.note || m.misc.notSpecified,
+          filter.isActive
+        );
+      });
+
+      await sendMessage(api, chatId, msg, env);
+    } catch (error) {
+      console.error("[AdminHandler]", "Failed to list filters", error);
+      await sendMessage(api, chatId, "❌ 获取过滤规则失败", env);
+    }
+    return;
+  }
+
+  // /filter add <regex> [block|drop] [note] [priority] - Add filter rule
+  if (text.startsWith("/filter add ")) {
+    const args = text.substring(12).trim();
+
+    if (!args) {
+      await sendMessage(api, chatId, m.admin.filterUsage, env);
+      return;
+    }
+
+    // Parse arguments: regex is required, others are optional
+    const parts = args.split(" ");
+    const regex = parts[0];
+    const mode = (parts[1] as "block" | "drop") || "block";
+    const note = parts[2] || undefined;
+    const priority = parts[3] ? parseInt(parts[3]) : 100;
+
+    // Validate mode
+    if (mode !== "block" && mode !== "drop") {
+      await sendMessage(api, chatId, "❌ 模式必须是 block 或 drop", env);
+      return;
+    }
+
+    try {
+      const result = await filterService.addFilter(
+        db,
+        regex,
+        mode,
+        note,
+        priority
+      );
+
+      if (result.success) {
+        await sendMessage(
+          api,
+          chatId,
+          m.admin.filterAdded(result.filterId!),
+          env
+        );
+      } else {
+        await sendMessage(
+          api,
+          chatId,
+          m.admin.filterAddFailed(result.error!),
+          env
+        );
+      }
+    } catch (error) {
+      console.error("[AdminHandler]", "Failed to add filter", error);
+      await sendMessage(api, chatId, "❌ 添加过滤规则失败", env);
+    }
+    return;
+  }
+
+  // /filter del <id> - Delete filter rule
+  if (text.startsWith("/filter del ")) {
+    const idStr = text.substring(12).trim();
+    const filterId = parseInt(idStr);
+
+    if (isNaN(filterId)) {
+      await sendMessage(api, chatId, "❌ 无效的规则ID", env);
+      return;
+    }
+
+    try {
+      const result = await filterService.deleteFilter(db, filterId);
+
+      if (result.success) {
+        await sendMessage(api, chatId, m.admin.filterDeleted(filterId), env);
+      } else {
+        await sendMessage(api, chatId, m.admin.filterDeleteFailed, env);
+      }
+    } catch (error) {
+      console.error("[AdminHandler]", "Failed to delete filter", error);
+      await sendMessage(api, chatId, "❌ 删除过滤规则失败", env);
+    }
+    return;
+  }
+
+  // /filter toggle <id> - Toggle filter rule
+  if (text.startsWith("/filter toggle ")) {
+    const idStr = text.substring(15).trim();
+    const filterId = parseInt(idStr);
+
+    if (isNaN(filterId)) {
+      await sendMessage(api, chatId, "❌ 无效的规则ID", env);
+      return;
+    }
+
+    try {
+      // Get current status first
+      const filters = await filterService.getAllFilters(db);
+      const filter = filters.find((f) => f.id === filterId);
+
+      if (!filter) {
+        await sendMessage(api, chatId, "❌ 规则不存在", env);
+        return;
+      }
+
+      const newStatus = !filter.isActive;
+      const result = await filterService.toggleFilter(db, filterId, newStatus);
+
+      if (result.success) {
+        await sendMessage(
+          api,
+          chatId,
+          m.admin.filterToggled(filterId, newStatus),
+          env
+        );
+      } else {
+        await sendMessage(api, chatId, m.admin.filterToggleFailed, env);
+      }
+    } catch (error) {
+      console.error("[AdminHandler]", "Failed to toggle filter", error);
+      await sendMessage(api, chatId, "❌ 切换规则状态失败", env);
+    }
+    return;
+  }
+
+  // /filter priority <id> <priority> - Update filter priority
+  if (text.startsWith("/filter priority ")) {
+    const args = text.substring(17).trim().split(" ");
+
+    if (args.length < 2) {
+      await sendMessage(
+        api,
+        chatId,
+        "❌ 用法: /filter priority <id> <优先级>",
+        env
+      );
+      return;
+    }
+
+    const filterId = parseInt(args[0]);
+    const priority = parseInt(args[1]);
+
+    if (isNaN(filterId) || isNaN(priority)) {
+      await sendMessage(api, chatId, "❌ 无效的参数", env);
+      return;
+    }
+
+    try {
+      const result = await filterService.updatePriority(db, filterId, priority);
+
+      if (result.success) {
+        await sendMessage(
+          api,
+          chatId,
+          m.admin.filterPrioritySet(filterId, priority),
+          env
+        );
+      } else {
+        await sendMessage(api, chatId, m.admin.filterPriorityFailed, env);
+      }
+    } catch (error) {
+      console.error(
+        "[AdminHandler]",
+        "Failed to update filter priority",
+        error
+      );
+      await sendMessage(api, chatId, "❌ 设置优先级失败", env);
     }
     return;
   }
@@ -307,12 +599,20 @@ export async function handleAdminMessage(
       );
 
       let statusMsg = m.admin.verificationStatusTitle;
-      statusMsg += config.enabled ? m.admin.verificationStatusEnabled : m.admin.verificationStatusDisabled;
-      statusMsg += m.admin.verificationStatusMethod(m.methodNames[config.method]);
-      statusMsg += m.admin.verificationStatusTimeout(Math.floor(config.timeout / 60));
+      statusMsg += config.enabled
+        ? m.admin.verificationStatusEnabled
+        : m.admin.verificationStatusDisabled;
+      statusMsg += m.admin.verificationStatusMethod(
+        m.methodNames[config.method]
+      );
+      statusMsg += m.admin.verificationStatusTimeout(
+        Math.floor(config.timeout / 60)
+      );
 
       if (config.method !== "none") {
-        statusMsg += validation.valid ? m.admin.verificationStatusComplete : m.admin.verificationStatusIncomplete;
+        statusMsg += validation.valid
+          ? m.admin.verificationStatusComplete
+          : m.admin.verificationStatusIncomplete;
         if (!validation.valid && validation.missing) {
           statusMsg += m.admin.verificationStatusMissing;
           validation.missing.forEach((key: string) => {
@@ -374,7 +674,12 @@ export async function handleAdminMessage(
         "Failed to set verification method",
         error
       );
-      await sendMessage(api, chatId, m.admin.verificationMethodSetFailed(""), env);
+      await sendMessage(
+        api,
+        chatId,
+        m.admin.verificationMethodSetFailed(""),
+        env
+      );
     }
     return;
   }
@@ -392,7 +697,12 @@ export async function handleAdminMessage(
       if (result.success) {
         await sendMessage(api, chatId, m.admin.verificationEnabled, env);
       } else {
-        await sendMessage(api, chatId, m.admin.verificationEnableFailed(result.error || ""), env);
+        await sendMessage(
+          api,
+          chatId,
+          m.admin.verificationEnableFailed(result.error || ""),
+          env
+        );
       }
     } catch (error) {
       console.error("[AdminHandler]", "Failed to enable verification", error);
@@ -414,11 +724,21 @@ export async function handleAdminMessage(
       if (result.success) {
         await sendMessage(api, chatId, m.admin.verificationDisabled, env);
       } else {
-        await sendMessage(api, chatId, m.admin.verificationDisableFailed(result.error || ""), env);
+        await sendMessage(
+          api,
+          chatId,
+          m.admin.verificationDisableFailed(result.error || ""),
+          env
+        );
       }
     } catch (error) {
       console.error("[AdminHandler]", "Failed to disable verification", error);
-      await sendMessage(api, chatId, m.admin.verificationDisableFailed(""), env);
+      await sendMessage(
+        api,
+        chatId,
+        m.admin.verificationDisableFailed(""),
+        env
+      );
     }
     return;
   }
@@ -436,13 +756,23 @@ export async function handleAdminMessage(
       });
 
       if (!targetUser) {
-        await sendMessage(api, chatId, m.admin.verifyUserNotFound(targetId), env);
+        await sendMessage(
+          api,
+          chatId,
+          m.admin.verifyUserNotFound(targetId),
+          env
+        );
         return;
       }
 
       // Check if already verified
       if (targetUser.isVerified) {
-        await sendMessage(api, chatId, m.admin.verifyUserAlreadyVerified(targetId), env);
+        await sendMessage(
+          api,
+          chatId,
+          m.admin.verifyUserAlreadyVerified(targetId),
+          env
+        );
         return;
       }
 
@@ -485,7 +815,10 @@ export async function handleAdminMessage(
       await sendMessage(
         api,
         targetId,
-        m.admin.verifyLinkSentToUser(targetId, Math.floor(env.VERIFICATION_TIMEOUT / 60)) + `\n${verifyLink}`,
+        m.admin.verifyLinkSentToUser(
+          targetId,
+          Math.floor(env.VERIFICATION_TIMEOUT / 60)
+        ) + `\n${verifyLink}`,
         env
       );
 
@@ -513,7 +846,12 @@ export async function handleAdminMessage(
       });
 
       if (!targetUser) {
-        await sendMessage(api, chatId, m.admin.verifyUserNotFound(targetId), env);
+        await sendMessage(
+          api,
+          chatId,
+          m.admin.verifyUserNotFound(targetId),
+          env
+        );
         return;
       }
 
@@ -556,7 +894,12 @@ export async function handleAdminMessage(
       });
 
       if (!targetUser) {
-        await sendMessage(api, chatId, m.admin.verifyUserNotFound(targetId), env);
+        await sendMessage(
+          api,
+          chatId,
+          m.admin.verifyUserNotFound(targetId),
+          env
+        );
         return;
       }
 
@@ -572,7 +915,12 @@ export async function handleAdminMessage(
         })
         .where(eq(users.id, targetId));
 
-      await sendMessage(api, chatId, m.admin.resetVerificationDone(targetId), env);
+      await sendMessage(
+        api,
+        chatId,
+        m.admin.resetVerificationDone(targetId),
+        env
+      );
 
       console.log("[AdminHandler]", "Admin reset verification attempts", {
         userId: targetId,
@@ -588,21 +936,26 @@ export async function handleAdminMessage(
   // /ban <user_id> [reason] [hours] - Ban user directly
   if (text.startsWith("/ban ")) {
     const parts = text.split(" ").filter((s: string) => s);
-    
+
     if (parts.length < 2) {
       await sendMessage(api, chatId, m.admin.banUsage, env);
       return;
     }
 
     const targetUserId = parts[1];
-    const reason = parts[2] || (lang === 'zh' ? "违反规则" : "Rule violation");
+    const reason = parts[2] || (lang === "zh" ? "违反规则" : "Rule violation");
     const hours = parts[3] ? parseInt(parts[3]) : undefined;
 
     try {
       const result = await banUser(db, targetUserId, reason, chatId, hours);
 
       if (result.success) {
-        await sendMessage(api, chatId, m.admin.banned(targetUserId, reason, hours), env);
+        await sendMessage(
+          api,
+          chatId,
+          m.admin.banned(targetUserId, reason, hours),
+          env
+        );
 
         // Also block
         await db
@@ -622,7 +975,7 @@ export async function handleAdminMessage(
   // /unban <user_id> - Unban user directly
   if (text.startsWith("/unban ")) {
     const parts = text.split(" ").filter((s: string) => s);
-    
+
     if (parts.length < 2) {
       await sendMessage(api, chatId, m.admin.unbanUsage, env);
       return;
@@ -667,15 +1020,23 @@ export async function handleAdminMessage(
   const targetUserId = mapping.userTelegramId;
 
   // /block or /ban - Ban user (reply mode)
-  if (text.startsWith("/block") || (text.startsWith("/ban") && !text.startsWith("/banlist"))) {
+  if (
+    text.startsWith("/block") ||
+    (text.startsWith("/ban") && !text.startsWith("/banlist"))
+  ) {
     const parts = text.split(" ").filter((s: string) => s);
-    const reason = parts[1] || (lang === 'zh' ? "违反规则" : "Rule violation");
+    const reason = parts[1] || (lang === "zh" ? "违反规则" : "Rule violation");
     const hours = parts[2] ? parseInt(parts[2]) : undefined;
 
     const result = await banUser(db, targetUserId, reason, chatId, hours);
 
     if (result.success) {
-      await sendMessage(api, chatId, m.admin.banned(targetUserId, reason, hours), env);
+      await sendMessage(
+        api,
+        chatId,
+        m.admin.banned(targetUserId, reason, hours),
+        env
+      );
 
       // Also block
       await db
@@ -712,9 +1073,11 @@ export async function handleAdminMessage(
       return;
     }
 
-    const locale = lang === 'zh' ? 'zh-CN' : 'en-US';
+    const locale = lang === "zh" ? "zh-CN" : "en-US";
     const banCheck = await checkBanned(db, targetUserId);
-    const status = user.isBlocked ? m.admin.userInfoStatusBlocked : m.admin.userInfoStatusNormal;
+    const status = user.isBlocked
+      ? m.admin.userInfoStatusBlocked
+      : m.admin.userInfoStatusNormal;
     const username = user.username ? `@${user.username}` : m.misc.none;
     const createdAt = new Date(user.createdAt * 1000).toLocaleString(locale);
     const updatedAt = new Date(user.updatedAt * 1000).toLocaleString(locale);
@@ -738,22 +1101,36 @@ ${m.admin.userInfoUpdatedAt}: ${updatedAt}`;
     // Rate limit info
     const config = getRateLimitConfig(user.rateLimitLevel || 0, env);
     info += m.admin.userInfoRateLimitTitle;
-    info += `${m.admin.userInfoRateLimitLevel}: ${m.rateLimitLevels[user.rateLimitLevel || 0]}`;
-    info += m.admin.userInfoRateLimitConfig(config.cooldown, config.perMinute, config.perHour);
-    info += `${m.admin.userInfoRateLimitViolations}: ${user.rateLimitViolations || 0}`;
+    info += `${m.admin.userInfoRateLimitLevel}: ${
+      m.rateLimitLevels[user.rateLimitLevel || 0]
+    }`;
+    info += m.admin.userInfoRateLimitConfig(
+      config.cooldown,
+      config.perMinute,
+      config.perHour
+    );
+    info += `${m.admin.userInfoRateLimitViolations}: ${
+      user.rateLimitViolations || 0
+    }`;
 
     if (user.rateLimitedUntil) {
       const now = Math.floor(Date.now() / 1000);
       if (user.rateLimitedUntil > now) {
-        info += `${m.admin.userInfoRateLimitPenaltyUntil}: ${new Date(user.rateLimitedUntil * 1000).toLocaleString(locale)}`;
+        info += `${m.admin.userInfoRateLimitPenaltyUntil}: ${new Date(
+          user.rateLimitedUntil * 1000
+        ).toLocaleString(locale)}`;
       }
     }
 
     if (banCheck.banned) {
       info += m.admin.userInfoBanTitle;
-      info += `${m.admin.userInfoBanReason}: ${banCheck.reason || m.misc.notSpecified}`;
+      info += `${m.admin.userInfoBanReason}: ${
+        banCheck.reason || m.misc.notSpecified
+      }`;
       if (banCheck.expiresAt) {
-        info += `${m.admin.userInfoBanExpires}: ${new Date(banCheck.expiresAt * 1000).toLocaleString(locale)}`;
+        info += `${m.admin.userInfoBanExpires}: ${new Date(
+          banCheck.expiresAt * 1000
+        ).toLocaleString(locale)}`;
       }
     }
 
@@ -765,7 +1142,9 @@ ${m.admin.userInfoUpdatedAt}: ${updatedAt}`;
       if (verifyStatus.isVerified) {
         info += m.admin.userInfoVerified;
         if (user.verifiedAt) {
-          info += `${m.admin.userInfoVerifiedAt}: ${new Date(user.verifiedAt * 1000).toLocaleString(locale)}`;
+          info += `${m.admin.userInfoVerifiedAt}: ${new Date(
+            user.verifiedAt * 1000
+          ).toLocaleString(locale)}`;
         }
       } else {
         info += m.admin.userInfoNotVerified;
@@ -783,7 +1162,10 @@ ${m.admin.userInfoUpdatedAt}: ${updatedAt}`;
           );
         }
 
-        info += m.admin.userInfoAttempts(user.verificationAttempts || 0, verifyStatus.attemptsRemaining);
+        info += m.admin.userInfoAttempts(
+          user.verificationAttempts || 0,
+          verifyStatus.attemptsRemaining
+        );
       }
     }
 
@@ -801,7 +1183,7 @@ ${m.admin.userInfoUpdatedAt}: ${updatedAt}`;
         return;
       }
 
-      const locale = lang === 'zh' ? 'zh-CN' : 'en-US';
+      const locale = lang === "zh" ? "zh-CN" : "en-US";
       let msg = m.admin.historyTitle(20);
       history.reverse().forEach((h, i) => {
         const time = new Date(h.createdAt * 1000).toLocaleString(locale, {
@@ -810,7 +1192,8 @@ ${m.admin.userInfoUpdatedAt}: ${updatedAt}`;
           hour: "2-digit",
           minute: "2-digit",
         });
-        const dir = h.direction === "in" ? m.admin.historyIn : m.admin.historyOut;
+        const dir =
+          h.direction === "in" ? m.admin.historyIn : m.admin.historyOut;
         const preview = h.content
           ? h.content.substring(0, 40) + (h.content.length > 40 ? "..." : "")
           : `[${h.messageType}]`;
@@ -840,7 +1223,7 @@ ${m.admin.userInfoUpdatedAt}: ${updatedAt}`;
       const confirmMsg = await sendMessage(
         api,
         chatId,
-        m.admin.templateAdded(keyword).replace('added', 'sent'),
+        m.admin.templateAdded(keyword).replace("added", "sent"),
         env
       );
 
@@ -923,7 +1306,7 @@ ${m.admin.userInfoUpdatedAt}: ${updatedAt}`;
         const confirmMsg = await sendMessage(
           api,
           chatId,
-          `✅ ${lang === 'zh' ? '已发送模板' : 'Sent template'} "${keyword}"`,
+          `✅ ${lang === "zh" ? "已发送模板" : "Sent template"} "${keyword}"`,
           env
         );
 

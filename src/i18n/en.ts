@@ -223,6 +223,49 @@ Available methods:
     menuStats: 'View statistics',
     menuBanlist: 'View banlist',
     menuVerification: 'Verification management',
+    menuFilter: 'Filter rules management',
+    menuSetting: 'Global settings',
+
+    // Setting commands
+    settingViewTitle: '📋 Global Settings\n\n',
+    settingAllowedTypes: (types: string) => `✅ Allowed message types: ${types}\n`,
+    settingEditNotification: (enabled: boolean) => `🔔 Edit notification: ${enabled ? 'Enabled' : 'Disabled'}\n`,
+    settingTypesSet: (types: string) => `✅ Allowed message types set to: ${types}`,
+    settingTypesInvalid: '❌ Invalid message type format',
+    settingEditSet: (enabled: boolean) => `✅ Edit notification ${enabled ? 'enabled' : 'disabled'}`,
+    settingEditInvalid: '❌ Invalid parameter, use on or off',
+
+    // Filter commands
+    filterListTitle: (count: number) => `📋 Filter Rules (${count} total)\n\n`,
+    filterListItem: (id: number, priority: number, mode: string, regex: string, note: string, active: boolean) =>
+      `🔹 ID: ${id} | Priority: ${priority} | Mode: ${mode}\n` +
+      `   Regex: ${regex}\n` +
+      `   Note: ${note}\n` +
+      `   Status: ${active ? '✅ Active' : '❌ Inactive'}\n\n`,
+    filterListEmpty: '📋 No filter rules',
+    filterAdded: (id: number) => `✅ Filter rule added (ID: ${id})`,
+    filterAddFailed: (error: string) => `❌ Failed to add: ${error}`,
+    filterDeleted: (id: number) => `✅ Rule ${id} deleted`,
+    filterDeleteFailed: '❌ Failed to delete',
+    filterToggled: (id: number, active: boolean) => `✅ Rule ${id} ${active ? 'enabled' : 'disabled'}`,
+    filterToggleFailed: '❌ Operation failed',
+    filterPrioritySet: (id: number, priority: number) => `✅ Rule ${id} priority set to ${priority}`,
+    filterPriorityFailed: '❌ Failed to set priority',
+    filterUsage: 'Usage:\n' +
+      '/filter list - List all rules\n' +
+      '/filter add <regex> [block|drop] [note] [priority] - Add rule\n' +
+      '/filter del <id> - Delete rule\n' +
+      '/filter toggle <id> - Toggle rule\n' +
+      '/filter priority <id> <priority> - Set priority',
+
+    // Edit notification
+    editNotificationTitle: (userName: string, userId: string) =>
+      `✏️ <b>User edited a message</b>\n\n` +
+      `👤 User: ${userName}\n` +
+      `🆔 ID: <code>${userId}</code>\n\n`,
+    editNotificationOld: (content: string) => `📝 <b>Original:</b>\n${content}\n\n`,
+    editNotificationNew: (content: string) => `📝 <b>Edited:</b>\n${content}`,
+    editNotificationCount: (count: number) => `\n\n<i>(Edit #${count})</i>`,
   },
 
   // User/Guest messages
@@ -249,6 +292,12 @@ If the link has expired, please try again later.`,
       const expiresText = expires ? `\nExpires: ${expires}` : '';
       return `⚠️ **High Risk Alert**\nUser ${userId} is on the banlist.\nReason: ${reason}${expiresText}`;
     },
+
+    // Message type filtering
+    messageTypeNotAllowed: (type: string) => `❌ ${type} type messages are not allowed`,
+
+    // Content filtering
+    contentFiltered: '🚫 Your message contains prohibited content and cannot be sent',
   },
 
   // Verification messages

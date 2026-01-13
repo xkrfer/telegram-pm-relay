@@ -5,6 +5,7 @@ import { parseEnv, type Env } from "./env";
 import { handleAdminMessage } from "./handlers/admin";
 import { handleGuestMessage } from "./handlers/guest";
 import { handleCallbackQuery } from "./handlers/callback";
+import { handleEditedMessage } from "./handlers/edit";
 import { configService } from "./services/config.service";
 import { markUserAsVerified } from "./services/verification.service";
 import { verifyTurnstileToken } from "./services/verification/turnstile";
@@ -44,6 +45,12 @@ app.post("/webhook", async (c) => {
     // Handle callback_query (button clicks)
     if (update.callback_query) {
       await handleCallbackQuery(db, bot.api, update.callback_query, env);
+      return c.text("ok");
+    }
+
+    // Handle edited messages
+    if (update.edited_message) {
+      await handleEditedMessage(db, bot.api, env, update.edited_message);
       return c.text("ok");
     }
 
@@ -99,7 +106,10 @@ app.get("/verify/:token", async (c) => {
     }
 
     // Show verification page
-    const htmlContent = getVerifyInlineHtml(lang, rawEnv.CLOUDFLARE_TURNSTILE_SITE_KEY || "");
+    const htmlContent = getVerifyInlineHtml(
+      lang,
+      rawEnv.CLOUDFLARE_TURNSTILE_SITE_KEY || ""
+    );
 
     return c.html(htmlContent);
   } catch (error) {

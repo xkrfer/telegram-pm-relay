@@ -90,10 +90,10 @@ class ConfigService {
     env: ParsedEnv,
     method: VerificationMethod,
     adminId: string,
-    lang: Language = 'en'
+    lang: Language = "en"
   ): Promise<{ success: boolean; error?: string }> {
     const m = getMessages(lang);
-    
+
     // Check config completeness
     const validation = await this.validateMethodConfig(method, env, lang);
     if (!validation.valid) {
@@ -159,10 +159,10 @@ class ConfigService {
     env: ParsedEnv,
     enabled: boolean,
     adminId: string,
-    lang: Language = 'en'
+    lang: Language = "en"
   ): Promise<{ success: boolean; error?: string }> {
     const m = getMessages(lang);
-    
+
     try {
       const currentConfig = await this.getVerificationConfig(db, env);
 
@@ -216,10 +216,10 @@ class ConfigService {
   async validateMethodConfig(
     method: VerificationMethod,
     env: ParsedEnv,
-    lang: Language = 'en'
+    lang: Language = "en"
   ): Promise<ConfigValidationResult> {
     const m = getMessages(lang);
-    
+
     switch (method) {
       case "none":
       case "math":
@@ -317,6 +317,227 @@ class ConfigService {
    */
   invalidateCache(): void {
     this.cache.clear();
+  }
+
+  /**
+   * Get general config (with caching)
+   */
+  async getGeneralConfig(
+    db: DrizzleD1Database<typeof schema>,
+    env: ParsedEnv
+  ): Promise<any> {
+    try {
+      const dbConfig = await db.query.systemConfig.findFirst();
+
+      if (dbConfig?.general) {
+        const generalData =
+          typeof dbConfig.general === "string"
+            ? JSON.parse(dbConfig.general)
+            : dbConfig.general;
+
+        return {
+          allowedTypes: generalData.allowedTypes || [
+            "text",
+            "photo",
+            "video",
+            "document",
+            "voice",
+            "sticker",
+            "animation",
+            "location",
+            "contact",
+          ],
+          editNotificationEnabled:
+            generalData.editNotificationEnabled !== undefined
+              ? generalData.editNotificationEnabled
+              : true,
+        };
+      }
+
+      // Default config
+      return {
+        allowedTypes: [
+          "text",
+          "photo",
+          "video",
+          "document",
+          "voice",
+          "sticker",
+          "animation",
+          "location",
+          "contact",
+        ],
+        editNotificationEnabled: true,
+      };
+    } catch (error) {
+      console.error("[ConfigService]", "Failed to get general config", error);
+      // Return default on error
+      return {
+        allowedTypes: [
+          "text",
+          "photo",
+          "video",
+          "document",
+          "voice",
+          "sticker",
+          "animation",
+          "location",
+          "contact",
+        ],
+        editNotificationEnabled: true,
+      };
+    }
+  }
+
+  /**
+   * Set allowed message types
+   */
+  async setAllowedTypes(
+    db: DrizzleD1Database<typeof schema>,
+    env: ParsedEnv,
+    types: string[],
+    adminId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Validate message types
+      const validation = this.validateMessageTypes(types);
+      if (!validation.valid) {
+        return { success: false, error: validation.error };
+      }
+
+      const currentConfig = await this.getGeneralConfig(db, env);
+      const existingConfig = await db.query.systemConfig.findFirst();
+
+      const now = Math.floor(Date.now() / 1000);
+
+      if (existingConfig) {
+        await db
+          .update(systemConfig)
+          .set({
+            general: JSON.stringify({
+              ...currentConfig,
+              allowedTypes: types,
+            }),
+            updatedAt: now,
+            updatedBy: adminId,
+          })
+          .where(eq(systemConfig.id, existingConfig.id));
+      } else {
+        await db.insert(systemConfig).values({
+          verification: JSON.stringify({
+            enabled: false,
+            method: "none",
+            timeout: 900,
+          }),
+          general: JSON.stringify({
+            ...currentConfig,
+            allowedTypes: types,
+          }),
+          updatedBy: adminId,
+        });
+      }
+
+      this.invalidateCache();
+
+      console.log("[ConfigService]", "Allowed types updated", {
+        types,
+        adminId,
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error("[ConfigService]", "Failed to set allowed types", error);
+      return { success: false, error: "设置失败" };
+    }
+  }
+
+  /**
+   * Set edit notification enabled
+   */
+  async setEditNotification(
+    db: DrizzleD1Database<typeof schema>,
+    env: ParsedEnv,
+    enabled: boolean,
+    adminId: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const currentConfig = await this.getGeneralConfig(db, env);
+      const existingConfig = await db.query.systemConfig.findFirst();
+
+      const now = Math.floor(Date.now() / 1000);
+
+      if (existingConfig) {
+        await db
+          .update(systemConfig)
+          .set({
+            general: JSON.stringify({
+              ...currentConfig,
+              editNotificationEnabled: enabled,
+            }),
+            updatedAt: now,
+            updatedBy: adminId,
+          })
+          .where(eq(systemConfig.id, existingConfig.id));
+      } else {
+        await db.insert(systemConfig).values({
+          verification: JSON.stringify({
+            enabled: false,
+            method: "none",
+            timeout: 900,
+          }),
+          general: JSON.stringify({
+            ...currentConfig,
+            editNotificationEnabled: enabled,
+          }),
+          updatedBy: adminId,
+        });
+      }
+
+      this.invalidateCache();
+
+      console.log("[ConfigService]", "Edit notification updated", {
+        enabled,
+        adminId,
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error(
+        "[ConfigService]",
+        "Failed to set edit notification",
+        error
+      );
+      return { success: false, error: "设置失败" };
+    }
+  }
+
+  /**
+   * Validate message types
+   */
+  validateMessageTypes(types: string[]): { valid: boolean; error?: string } {
+    const validTypes = [
+      "text",
+      "photo",
+      "video",
+      "document",
+      "voice",
+      "sticker",
+      "animation",
+      "location",
+      "contact",
+    ];
+
+    for (const type of types) {
+      if (!validTypes.includes(type)) {
+        return { valid: false, error: `无效的消息类型: ${type}` };
+      }
+    }
+
+    if (types.length === 0) {
+      return { valid: false, error: "至少需要允许一种消息类型" };
+    }
+
+    return { valid: true };
   }
 }
 

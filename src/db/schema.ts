@@ -49,6 +49,8 @@ export const messages = sqliteTable('messages', {
   content: text('content'),
   rawData: text('raw_data'), // JSON string
   mediaGroupId: text('media_group_id'),
+  lastEditNotificationAt: integer('last_edit_notification_at'), // 上次编辑通知时间
+  editCount: integer('edit_count').notNull().default(0), // 编辑次数
   createdAt: integer('created_at').notNull().default(sql`(unixepoch())`), // Unix timestamp
 });
 
@@ -75,8 +77,20 @@ export const fraudList = sqliteTable('fraud_list', {
 export const systemConfig = sqliteTable('system_config', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   verification: text('verification').notNull(), // JSON string
+  general: text('general').default('{}'), // 通用配置 JSON string
   updatedAt: integer('updated_at').notNull().default(sql`(unixepoch())`), // Unix timestamp
   updatedBy: text('updated_by'),
+});
+
+// Message Filters表 - 消息过滤规则
+export const messageFilters = sqliteTable('message_filters', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  regex: text('regex').notNull(),
+  mode: text('mode', { enum: ['block', 'drop'] }).notNull().default('block'),
+  note: text('note'),
+  priority: integer('priority').notNull().default(100),
+  isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  createdAt: integer('created_at').notNull().default(sql`(unixepoch())`), // Unix timestamp
 });
 
 // 类型导出
@@ -87,3 +101,5 @@ export type Message = typeof messages.$inferSelect;
 export type ReplyTemplate = typeof replyTemplates.$inferSelect;
 export type FraudListItem = typeof fraudList.$inferSelect;
 export type SystemConfig = typeof systemConfig.$inferSelect;
+export type MessageFilter = typeof messageFilters.$inferSelect;
+export type NewMessageFilter = typeof messageFilters.$inferInsert;

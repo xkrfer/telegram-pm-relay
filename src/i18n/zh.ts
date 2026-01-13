@@ -223,6 +223,49 @@ export const zh: Messages = {
     menuStats: '查看统计信息',
     menuBanlist: '查看黑名单',
     menuVerification: '验证系统管理',
+    menuFilter: '过滤规则管理',
+    menuSetting: '全局配置',
+
+    // Setting commands
+    settingViewTitle: '📋 全局配置\n\n',
+    settingAllowedTypes: (types: string) => `✅ 允许的消息类型：${types}\n`,
+    settingEditNotification: (enabled: boolean) => `🔔 编辑通知：${enabled ? '开启' : '关闭'}\n`,
+    settingTypesSet: (types: string) => `✅ 已设置允许的消息类型：${types}`,
+    settingTypesInvalid: '❌ 消息类型格式错误',
+    settingEditSet: (enabled: boolean) => `✅ 编辑通知已${enabled ? '开启' : '关闭'}`,
+    settingEditInvalid: '❌ 参数错误，请使用 on 或 off',
+
+    // Filter commands
+    filterListTitle: (count: number) => `📋 过滤规则列表 (共 ${count} 条)\n\n`,
+    filterListItem: (id: number, priority: number, mode: string, regex: string, note: string, active: boolean) =>
+      `🔹 ID: ${id} | 优先级: ${priority} | 模式: ${mode}\n` +
+      `   正则: ${regex}\n` +
+      `   备注: ${note}\n` +
+      `   状态: ${active ? '✅ 启用' : '❌ 禁用'}\n\n`,
+    filterListEmpty: '📋 暂无过滤规则',
+    filterAdded: (id: number) => `✅ 过滤规则已添加 (ID: ${id})`,
+    filterAddFailed: (error: string) => `❌ 添加失败：${error}`,
+    filterDeleted: (id: number) => `✅ 已删除规则 ${id}`,
+    filterDeleteFailed: '❌ 删除失败',
+    filterToggled: (id: number, active: boolean) => `✅ 规则 ${id} 已${active ? '启用' : '禁用'}`,
+    filterToggleFailed: '❌ 操作失败',
+    filterPrioritySet: (id: number, priority: number) => `✅ 规则 ${id} 优先级已设置为 ${priority}`,
+    filterPriorityFailed: '❌ 设置失败',
+    filterUsage: '用法：\n' +
+      '/filter list - 列出所有规则\n' +
+      '/filter add <正则> [block|drop] [备注] [优先级] - 添加规则\n' +
+      '/filter del <id> - 删除规则\n' +
+      '/filter toggle <id> - 启用/禁用规则\n' +
+      '/filter priority <id> <优先级> - 调整优先级',
+
+    // Edit notification
+    editNotificationTitle: (userName: string, userId: string) =>
+      `✏️ <b>用户修改了消息</b>\n\n` +
+      `👤 用户：${userName}\n` +
+      `🆔 ID：<code>${userId}</code>\n\n`,
+    editNotificationOld: (content: string) => `📝 <b>原内容：</b>\n${content}\n\n`,
+    editNotificationNew: (content: string) => `📝 <b>新内容：</b>\n${content}`,
+    editNotificationCount: (count: number) => `\n\n<i>（第 ${count} 次编辑）</i>`,
   },
 
   // User/Guest messages
@@ -249,6 +292,12 @@ export const zh: Messages = {
       const expiresText = expires ? `\n过期时间：${expires}` : '';
       return `⚠️ **高风险提醒**\n用户 ${userId} 在黑名单中。\n原因：${reason}${expiresText}`;
     },
+
+    // Message type filtering
+    messageTypeNotAllowed: (type: string) => `❌ 不支持发送 ${type} 类型的消息`,
+
+    // Content filtering
+    contentFiltered: '🚫 您的消息包含违规内容，无法发送',
   },
 
   // Verification messages

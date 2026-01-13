@@ -147,6 +147,34 @@ export interface Messages {
     menuStats: string;
     menuBanlist: string;
     menuVerification: string;
+    menuFilter: string;
+    menuSetting: string;
+    // Setting commands
+    settingViewTitle: string;
+    settingAllowedTypes: (types: string) => string;
+    settingEditNotification: (enabled: boolean) => string;
+    settingTypesSet: (types: string) => string;
+    settingTypesInvalid: string;
+    settingEditSet: (enabled: boolean) => string;
+    settingEditInvalid: string;
+    // Filter commands
+    filterListTitle: (count: number) => string;
+    filterListItem: (id: number, priority: number, mode: string, regex: string, note: string, active: boolean) => string;
+    filterListEmpty: string;
+    filterAdded: (id: number) => string;
+    filterAddFailed: (error: string) => string;
+    filterDeleted: (id: number) => string;
+    filterDeleteFailed: string;
+    filterToggled: (id: number, active: boolean) => string;
+    filterToggleFailed: string;
+    filterPrioritySet: (id: number, priority: number) => string;
+    filterPriorityFailed: string;
+    filterUsage: string;
+    // Edit notification
+    editNotificationTitle: (userName: string, userId: string) => string;
+    editNotificationOld: (content: string) => string;
+    editNotificationNew: (content: string) => string;
+    editNotificationCount: (count: number) => string;
   };
 
   // User/Guest messages
@@ -160,6 +188,10 @@ export interface Messages {
     rateLimitedNotify: (name: string, id: string, reason: string) => string;
     newSession: (name: string, id: string) => string;
     highRiskWarning: (userId: string, reason: string, expires?: string) => string;
+    // Message type filtering
+    messageTypeNotAllowed: (type: string) => string;
+    // Content filtering
+    contentFiltered: string;
   };
 
   // Verification messages

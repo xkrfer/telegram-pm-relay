@@ -17,9 +17,29 @@ import {
   startVerification,
 } from "../services/verification.service";
 import { configService } from "../services/config.service";
+import { filterService } from "../services/filter.service";
 import type { DrizzleD1Database } from "drizzle-orm/d1";
 import * as schema from "../db/schema";
 import type { Api } from "grammy";
+import type { MessageType } from "../types/config";
+
+/**
+ * 获取消息类型
+ * @param msg Telegram 消息对象
+ * @returns 消息类型
+ */
+function getMessageType(msg: any): MessageType {
+  if (msg.text) return 'text';
+  if (msg.photo) return 'photo';
+  if (msg.video) return 'video';
+  if (msg.document) return 'document';
+  if (msg.voice) return 'voice';
+  if (msg.sticker) return 'sticker';
+  if (msg.animation) return 'animation';
+  if (msg.location) return 'location';
+  if (msg.contact) return 'contact';
+  return 'text';
+}
 
 export async function handleGuestMessage(
   db: DrizzleD1Database<typeof schema>,
@@ -153,7 +173,25 @@ export async function handleGuestMessage(
     }
   }
 
-  // 5. Rate limit check
+  // 5. Message type filtering
+  const generalConfig = await configService.getGeneralConfig(db, env);
+  const messageType = getMessageType(msg);
+
+  if (!generalConfig.allowedTypes.includes(messageType)) {
+    await sendMessage(
+      api,
+      chatId,
+      m.user.messageTypeNotAllowed(messageType),
+      env
+    );
+    console.log('[GuestHandler]', 'Message type not allowed', {
+      chatId,
+      messageType
+    });
+    return;
+  }
+
+  // 6. Rate limit check
   const rateLimitCheck = await checkRateLimit(db, chatId, user, env, lang);
 
   if (!rateLimitCheck.allowed) {
@@ -186,7 +224,39 @@ export async function handleGuestMessage(
   // Record message time
   await recordMessageTime(db, chatId);
 
-  // 6. Check if first message (send auto welcome)
+  // 7. Content filtering
+  const content = msg.text || msg.caption;
+  if (content) {
+    const filterResult = await filterService.checkContent(db, content);
+
+    if (filterResult.matched) {
+      const rule = filterResult.rule!;
+
+      if (rule.mode === 'block') {
+        await sendMessage(api, chatId, m.user.contentFiltered, env);
+        console.log('[Filter:Block]', {
+          userId: chatId,
+          filterId: rule.id,
+          regex: rule.regex
+        });
+      } else {
+        // Drop mode: silent rejection
+        console.warn('[Filter:Drop]', {
+          timestamp: new Date().toISOString(),
+          userId: chatId,
+          username: msg.chat.username || 'N/A',
+          contentPreview: content.substring(0, 50),
+          filterId: rule.id,
+          filterRegex: rule.regex,
+          filterNote: rule.note || 'N/A'
+        });
+      }
+
+      return; // 终止消息转发
+    }
+  }
+
+  // 8. Check if first message (send auto welcome)
   if (env.AUTO_WELCOME && user?.messageCount === 1) {
     try {
       await sendMessage(api, chatId, env.WELCOME_MESSAGE, env);
@@ -195,7 +265,7 @@ export async function handleGuestMessage(
     }
   }
 
-  // 7. Fraud detection
+  // 9. Fraud detection
   const banCheck = await checkBanned(db, chatId);
   const locale = lang === 'zh' ? 'zh-CN' : 'en-US';
 
@@ -211,7 +281,7 @@ export async function handleGuestMessage(
     );
   }
 
-  // 8. Notification rate limit
+  // 10. Notification rate limit
   const lastNotif = user?.lastNotificationAt;
 
   if (!lastNotif || now - lastNotif > env.NOTIFY_INTERVAL / 1000) {
@@ -234,7 +304,7 @@ export async function handleGuestMessage(
       .where(eq(users.id, chatId));
   }
 
-  // 9. Forward message and save records
+  // 11. Forward message and save records
   try {
     // Forward message
     const fwdMsg = await forwardMessage(
