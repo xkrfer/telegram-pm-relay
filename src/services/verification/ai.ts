@@ -95,12 +95,15 @@ export class AIVerification extends BaseVerificationMethod {
     });
 
     try {
+      // Generate random seed to ensure different questions each time
+      const randomSeed = Math.floor(Math.random() * 10000) + 1;
+
       const { output: quiz } = await generateText({
         model: provider.chatModel(env.AI_VERIFICATION_MODEL),
         output: Output.object({ schema: quizSchema }),
         system:
-          "You are a helpful assistant that generates simple quiz questions for human verification.",
-        prompt: m.verification.aiPrompt,
+          "You are a helpful assistant that generates simple quiz questions for human verification. Always generate a unique and creative question.",
+        prompt: `${m.verification.aiPrompt}\n\n[Seed: ${randomSeed}] Please generate a unique question that is different from typical examples.`,
         temperature: 0.8,
       });
 
