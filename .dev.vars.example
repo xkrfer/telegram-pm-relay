@@ -1,0 +1,19 @@
+# Local Development Environment Variables
+# Copy this file to .dev.vars and fill in actual values
+# .dev.vars is ignored by .gitignore and won't be committed
+
+# Telegram Bot Configuration
+BOT_TOKEN=your-telegram-bot-token
+BOT_SECRET=your-webhook-secret
+ADMIN_UID=your-telegram-user-id
+
+# Cloudflare Turnstile Verification
+CLOUDFLARE_TURNSTILE_SITE_KEY=your-turnstile-site-key
+CLOUDFLARE_TURNSTILE_SECRET_KEY=your-turnstile-secret-key
+
+# AI Verification Configuration
+AI_VERIFICATION_API_KEY=your-ai-api-key
+AI_VERIFICATION_BASE_URL=https://api.example.com/v1
+
+# Verification Page URL (use ngrok tunnel for local development)
+VERIFICATION_BASE_URL=https://your-worker.workers.dev

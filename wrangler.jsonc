@@ -1,0 +1,39 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "telegram-pm-relay",
+	"main": "src/index.ts",
+	"compatibility_date": "2026-01-13",
+	"vars": {
+		"LANGUAGE": "en",
+		"NOTIFY_INTERVAL": "3600000",
+		"LOG_LEVEL": "info",
+		"NODE_ENV": "production",
+		"SILENT_HOURS": "22:00-08:00",
+		"ADMIN_TIMEZONE": "Asia/Shanghai",
+		"AUTO_WELCOME": "true",
+		"WELCOME_MESSAGE": "Hello! I have received your message and will reply as soon as possible.",
+		"STATS_CACHE_TTL": "300",
+		"RATE_LIMIT_COOLDOWN": "3",
+		"RATE_LIMIT_PER_MINUTE": "10",
+		"RATE_LIMIT_PER_HOUR": "50",
+		"RATE_LIMIT_PENALTY_DURATION": "60",
+		"VERIFICATION_REQUIRED": "true",
+		"VERIFICATION_TIMEOUT": "900",
+		"AI_VERIFICATION_MODEL": "google/gemini-2.5-flash"
+	},
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "telegram_pm_relay",
+			"database_id": "b4b598c2-6f4a-4c68-ac55-13bcfdd14086"
+		}
+	],
+	"triggers": {
+		"crons": [
+			"0 * * * *"
+		]
+	},
+	"compatibility_flags": [
+		"nodejs_compat"
+	]
+}
