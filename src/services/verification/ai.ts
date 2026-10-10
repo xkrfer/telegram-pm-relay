@@ -94,16 +94,23 @@ export class AIVerification extends BaseVerificationMethod {
           { role: "system", content: "Generate a simple human verification quiz. Return only JSON with question, options (exactly four distinct strings), and correct (integer index 0-3)." },
           { role: "user", content: `${m.verification.aiPrompt}\n[Seed: ${randomSeed}]` },
         ],
-        response_format: { type: "json_schema", json_schema: z.toJSONSchema(quizSchema) },
-        max_tokens: 512,
+        response_format: {
+          type: "json_schema",
+          json_schema: { name: "verification_quiz", strict: true, schema: z.toJSONSchema(quizSchema) },
+        },
+        stream: false,
+        reasoning_effort: "low",
+        max_completion_tokens: 2048,
         temperature: 0.8,
       });
-      if (!("response" in result) || result.response == null) {
-        throw new Error("Workers AI returned no quiz");
+      const choice = result.choices?.[0];
+      if (choice?.finish_reason !== "stop") {
+        throw new Error(`Workers AI did not complete the quiz (finish_reason=${choice?.finish_reason ?? "missing"})`);
       }
-      const quiz = quizSchema.parse(
-        typeof result.response === "string" ? JSON.parse(result.response) : result.response
-      );
+      if (choice.message?.refusal || !choice.message?.content) {
+        throw new Error("Workers AI returned no quiz content or refused the request");
+      }
+      const quiz = quizSchema.parse(JSON.parse(choice.message.content));
       if (new Set(quiz.options).size !== 4) {
         throw new Error("Workers AI returned duplicate options");
       }
@@ -114,7 +121,10 @@ export class AIVerification extends BaseVerificationMethod {
 
       return quiz;
     } catch (error) {
-      console.error("[AIVerification]", "Failed to generate AI quiz", error);
+      console.error("[AIVerification]", "Failed to generate AI quiz", {
+        model: env.AI_VERIFICATION_MODEL,
+        error: error instanceof Error ? error.message : String(error),
+      });
       throw error;
     }
   }

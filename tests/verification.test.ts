@@ -26,20 +26,36 @@ afterEach(() => configService.invalidateCache());
 const quiz = { question: "Which is a fruit?", options: ["Apple", "Rock", "Chair", "Cloud"], correct: 0 };
 
 describe("Workers AI verification", () => {
-  for (const response of [JSON.stringify(quiz), quiz]) {
+  for (const response of [JSON.stringify(quiz)]) {
     test(`accepts validated ${typeof response} output via the AI binding`, async () => {
-      const { env, run } = environment({ response });
+      const { env, run } = environment({ choices: [{ finish_reason: "stop", message: { content: response } }] });
       const { db, set } = database();
       const challenge = await new AIVerification().generateChallenge(db, {} as any, env, "123", "token");
       expect(challenge.question).toBe(quiz.question);
       expect(challenge.correctAnswer).toBe(0);
       expect(run.mock.calls[0][0]).toBe("@cf/qwen/qwen3.8-27b");
+      expect(run.mock.calls[0][1].response_format.json_schema).toMatchObject({ name: "verification_quiz", strict: true, schema: { type: "object" } });
+      expect(run.mock.calls[0][1].reasoning_effort).toBe("low");
       expect(JSON.parse(set.mock.calls[0][0].verificationData).method).toBe("ai");
     });
   }
   for (const response of [undefined, "not JSON", { ...quiz, correct: 0.5 }, { ...quiz, correct: 4 }, { ...quiz, options: ["a", "a", "b", "c"] }, { ...quiz, question: " " }]) {
     test(`rejects invalid output ${JSON.stringify(response)}`, async () => {
-      const { env } = environment({ response });
+      const { env } = environment({ choices: [{ finish_reason: "stop", message: { content: response } }] });
+      const { db, set } = database();
+      await expect(new AIVerification().generateChallenge(db, {} as any, env, "123", "token")).rejects.toThrow();
+      expect(set).not.toHaveBeenCalled();
+    });
+  }
+  for (const result of [
+    {},
+    { response: JSON.stringify(quiz) },
+    { choices: [] },
+    { choices: [{ finish_reason: "length", message: { content: JSON.stringify(quiz) } }] },
+    { choices: [{ finish_reason: "stop", message: { content: null, refusal: "refused" } }] },
+  ]) {
+    test(`rejects incomplete or unexpected chat completion ${JSON.stringify(result)}`, async () => {
+      const { env } = environment(result);
       const { db, set } = database();
       await expect(new AIVerification().generateChallenge(db, {} as any, env, "123", "token")).rejects.toThrow();
       expect(set).not.toHaveBeenCalled();
