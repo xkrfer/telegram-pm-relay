@@ -451,7 +451,6 @@ Please return in JSON format with question, options (array of 4), and correct (i
     errorMathWrong: "❌ Calculation error\n\n",
     errorQuizWrong: "❌ Wrong answer\n\n",
     errorAIWrong: "❌ Incorrect answer\n\n",
-    errorCorrectAnswer: (answer) => `💡 The correct answer is: ${answer}\n\n`,
     errorRetry:
       "🔄 Please send a message again to get a new verification question",
     errorProcessing:

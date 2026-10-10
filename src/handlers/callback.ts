@@ -150,11 +150,6 @@ async function handleVerificationCallback(
       }
     } else {
       // Verification failed
-      const verificationDataStr = user.verificationData;
-      const verificationData = verificationDataStr
-        ? (typeof verificationDataStr === 'string' ? JSON.parse(verificationDataStr) : verificationDataStr)
-        : null;
-
       // Show failure message header based on method
       const failureHeaders = {
         math: m.verification.errorMathWrong,
@@ -162,25 +157,7 @@ async function handleVerificationCallback(
         ai: m.verification.errorAIWrong,
       };
 
-      let errorMessage = failureHeaders[method];
-
-      // Show correct answer hint
-      if (method === "math" || method === "quiz" || method === "ai") {
-        if (
-          verificationData?.options &&
-          verificationData?.correctAnswer !== undefined
-        ) {
-          const correctIndex =
-            typeof verificationData.correctAnswer === "number"
-              ? verificationData.correctAnswer
-              : parseInt(verificationData.correctAnswer.toString());
-
-          const correctOption = verificationData.options[correctIndex];
-          errorMessage += m.verification.errorCorrectAnswer(correctOption);
-        }
-      }
-
-      errorMessage += m.verification.errorRetry;
+      const errorMessage = failureHeaders[method] + m.verification.errorRetry;
 
       await api.editMessageText(userId, messageId, errorMessage);
 

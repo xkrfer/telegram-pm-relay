@@ -217,7 +217,6 @@ export interface Messages {
     errorMathWrong: string;
     errorQuizWrong: string;
     errorAIWrong: string;
-    errorCorrectAnswer: (answer: string) => string;
     errorRetry: string;
     errorProcessing: string;
   };

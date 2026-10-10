@@ -427,7 +427,6 @@ export const zh: Messages = {
     errorMathWrong: "❌ 计算错误\n\n",
     errorQuizWrong: "❌ 答案错误\n\n",
     errorAIWrong: "❌ 回答不正确\n\n",
-    errorCorrectAnswer: (answer) => `💡 正确答案是：${answer}\n\n`,
     errorRetry: "🔄 请重新发送消息获取新的验证题目",
     errorProcessing: "❌ 验证处理失败，请稍后重试",
 
