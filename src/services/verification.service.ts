@@ -53,6 +53,7 @@ export async function startVerification(
       .set({
         verificationToken: token,
         verificationExpiresAt: expiresAt,
+        verificationData: null,
         updatedAt: Math.floor(Date.now() / 1000),
       })
       .where(eq(users.id, userId));
@@ -241,44 +242,6 @@ export async function recordVerificationAttempt(
       updatedAt: now,
     })
     .where(eq(users.id, userId));
-}
-
-/**
- * Create verification link
- */
-export async function createVerificationLink(
-  db: DrizzleD1Database<typeof schema>,
-  env: ParsedEnv,
-  userId: string
-): Promise<string> {
-  const token = await generateVerificationToken();
-  const expiresAt = Math.floor(Date.now() / 1000) + env.VERIFICATION_TIMEOUT;
-
-  await db
-    .update(users)
-    .set({
-      verificationToken: token,
-      verificationExpiresAt: expiresAt,
-      updatedAt: Math.floor(Date.now() / 1000),
-    })
-    .where(eq(users.id, userId));
-
-  return `${env.VERIFICATION_BASE_URL}/verify/${token}`;
-}
-
-/**
- * Verify Cloudflare Turnstile token
- * @deprecated Moved to verification/turnstile.ts, use that implementation
- */
-export async function verifyTurnstileToken(
-  env: ParsedEnv,
-  token: string
-): Promise<boolean> {
-  // Import and call new implementation
-  const { verifyTurnstileToken: newVerifyTurnstileToken } = await import(
-    "./verification/turnstile"
-  );
-  return newVerifyTurnstileToken(env, token);
 }
 
 /**

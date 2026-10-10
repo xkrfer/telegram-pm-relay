@@ -91,8 +91,7 @@ export interface Messages {
     verifyUserAlreadyVerified: (userId: string) => string;
     verifyCannotGenerate: (userId: string) => string;
     verifyCooldown: (duration: string) => string;
-    verifyLinkGenerated: (userId: string, link: string, minutes: number, attemptsRemaining?: number) => string;
-    verifyLinkSentToUser: (userId: string, minutes: number) => string;
+    verifyChallengeSent: (userId: string) => string;
     verifySendFailed: string;
     reverifyCleared: (userId: string) => string;
     reverifyFailed: string;
@@ -201,10 +200,6 @@ export interface Messages {
     // Quiz
     quizQuestion: (question: string) => string;
     quizBank: QuizQuestion[];
-    // Turnstile
-    turnstileMessage: (minutes: number) => string;
-    turnstileButton: string;
-    turnstileChallenge: string;
     // AI
     aiQuestion: (question: string) => string;
     aiPrompt: string;
@@ -225,14 +220,6 @@ export interface Messages {
     errorCorrectAnswer: (answer: string) => string;
     errorRetry: string;
     errorProcessing: string;
-    // Link verification (web page)
-    linkInvalid: string;
-    linkAlreadyVerified: string;
-    linkExpired: string;
-    linkPageFailed: string;
-    linkMissingToken: string;
-    linkVerifyFailed: string;
-    linkServerError: string;
   };
 
   // Rate limit messages
@@ -270,7 +257,6 @@ export interface Messages {
   // Config service messages
   config: {
     dbOperationFailed: string;
-    missingTurnstile: string;
     missingAI: string;
     unknownMethod: string;
   };
@@ -320,7 +306,6 @@ export interface Messages {
     none: string;
     math: string;
     quiz: string;
-    turnstile: string;
     ai: string;
   };
 

@@ -56,7 +56,7 @@ Current Admin ID: {ADMIN_UID}
 • /verification status - View verification status
 • /verification set <method> - Set verification method
 • /verification enable/disable - Enable/disable verification
-• /verify <user_id> - Send verification link to user
+• /verify <user_id> - Send verification challenge to user
 • /reverify <user_id> - Clear verification status
 • /reset-verification <user_id> - Reset verification limits
 
@@ -167,7 +167,6 @@ Available methods:
 • none - Disable verification
 • math - Math verification ✨ Recommended
 • quiz - Quiz verification
-• turnstile - Cloudflare Turnstile
 • ai - AI verification`,
     verificationMethodSetFailed: (error) =>
       `❌ Set failed: ${error}\n\nPlease configure required environment variables first`,
@@ -179,25 +178,17 @@ Available methods:
     verifyUserAlreadyVerified: (userId) =>
       `✅ User ${userId} is already verified`,
     verifyCannotGenerate: (userId) =>
-      `❌ Cannot generate verification link for user ${userId}\n\n`,
+      `❌ Cannot generate verification challenge for user ${userId}\n\n`,
     verifyCooldown: (duration) =>
       `⏳ Verification cooldown, please wait ${duration}`,
-    verifyLinkGenerated: (userId, link, minutes, attemptsRemaining) => {
-      const attemptsMsg =
-        attemptsRemaining !== undefined
-          ? `\n💡 Attempts remaining: ${attemptsRemaining}/3 (per hour)`
-          : "";
-      return `✅ Verification link generated\n\nUser ID: ${userId}\nLink: ${link}\n\n⏱️ Link expires in ${minutes} minutes${attemptsMsg}`;
-    },
-    verifyLinkSentToUser: (userId, minutes) =>
-      `🔒 Admin requests you to complete verification\n\nPlease click the link below to verify:\n\n⏱️ Link expires in ${minutes} minutes`,
+    verifyChallengeSent: (userId) => `✅ Verification challenge sent to user ${userId}`,
     verifySendFailed:
-      "❌ Failed to send verification link, please check user ID",
+      "❌ Failed to send verification challenge, please check user ID",
     reverifyCleared: (userId) =>
       `✅ Cleared verification status for user ${userId}\nUser will need to re-verify on next message`,
     reverifyFailed: "❌ Operation failed, please check user ID",
     resetVerificationDone: (userId) =>
-      `✅ Reset verification limits for user ${userId}\nUser can now request a new verification link`,
+      `✅ Reset verification limits for user ${userId}\nUser can now request a new verification challenge`,
     resetVerificationFailed: "❌ Operation failed, please check user ID",
 
     // User check
@@ -330,9 +321,9 @@ Usage: Send a message directly to this bot to contact the admin.
 
 Note: Admin replies may not arrive immediately, please be patient.`,
 
-    verificationPending: `⏳ Your verification link is still valid
+    verificationPending: `⏳ Your verification challenge is still valid
 
-Please check the verification link sent to you earlier and complete verification.
+Please check the verification challenge sent to you earlier and complete verification.
 
 If the link has expired, please try again later.`,
 
@@ -422,12 +413,6 @@ If the link has expired, please try again later.`,
       },
     ],
 
-    // Turnstile
-    turnstileMessage: (minutes) =>
-      `🔒 First-time users need to complete verification\n\n⏱️ Link expires in ${minutes} minutes`,
-    turnstileButton: "🔐 Click to verify",
-    turnstileChallenge: "Please complete Cloudflare Turnstile verification",
-
     // AI
     aiQuestion: (question) =>
       `🤖 Please answer the following question:\n\n${question}`,
@@ -472,17 +457,6 @@ Please return in JSON format with question, options (array of 4), and correct (i
     errorProcessing:
       "❌ Verification processing failed, please try again later",
 
-    // Link verification (web page)
-    linkInvalid:
-      "<h1>❌ Invalid Verification Link</h1>\n<p>This verification link does not exist or has been used.</p>\n<p>Please send a new message to the bot to get a new verification link.</p>",
-    linkAlreadyVerified:
-      "<h1>✅ Already Verified</h1>\n<p>Your account has been verified and you can use the bot directly.</p>",
-    linkExpired:
-      "<h1>⏰ Verification Link Expired</h1>\n<p>This verification link has expired. Please send a new message to the bot to get a new verification link.</p>",
-    linkPageFailed: "<h1>❌ Failed to Load Verification Page</h1>",
-    linkMissingToken: "Missing verification token",
-    linkVerifyFailed: "Verification failed, please try again",
-    linkServerError: "Server error",
   },
 
   // Rate limit messages
@@ -547,7 +521,6 @@ If you have questions, please contact the admin.`,
   // Config service messages
   config: {
     dbOperationFailed: "Database operation failed",
-    missingTurnstile: "Missing Turnstile configuration",
     missingAI: "Missing AI verification configuration",
     unknownMethod: "Unknown verification method",
   },
@@ -567,7 +540,7 @@ If you have questions, please contact the admin.`,
     cooldownMessage: (duration) =>
       `Verification cooldown, please wait ${duration}`,
     limitReached: "Verification limit reached (3 times/hour)",
-    invalidLink: "Invalid verification link",
+    invalidLink: "Invalid verification challenge",
     linkExpired: "Verification link expired, please get a new one",
   },
 
@@ -599,7 +572,6 @@ If you have questions, please contact the admin.`,
     none: "No Verification",
     math: "Math Verification",
     quiz: "Quiz Verification",
-    turnstile: "Cloudflare Turnstile",
     ai: "AI Verification",
   },
 

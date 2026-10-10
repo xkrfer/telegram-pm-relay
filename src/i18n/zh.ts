@@ -56,7 +56,7 @@ export const zh: Messages = {
 • /verification status - 查看验证系统状态
 • /verification set <方式> - 设置验证方式
 • /verification enable/disable - 启用/禁用验证
-• /verify <user_id> - 发送验证链接给用户
+• /verify <user_id> - 发送验证题目给用户
 • /reverify <user_id> - 清除验证状态
 • /reset-verification <user_id> - 重置验证限制
 
@@ -158,7 +158,6 @@ export const zh: Messages = {
 • none - 禁用验证
 • math - 算术题验证 ✨ 推荐
 • quiz - 题库问答
-• turnstile - Cloudflare Turnstile
 • ai - AI 智能验证`,
     verificationMethodSetFailed: (error) =>
       `❌ 设置失败：${error}\n\n请先配置所需的环境变量`,
@@ -169,23 +168,15 @@ export const zh: Messages = {
     verifyUserNotFound: (userId) => `❌ 用户 ${userId} 不存在`,
     verifyUserAlreadyVerified: (userId) => `✅ 用户 ${userId} 已经验证过了`,
     verifyCannotGenerate: (userId) =>
-      `❌ 无法为用户 ${userId} 生成验证链接\n\n`,
+      `❌ 无法为用户 ${userId} 生成验证题目\n\n`,
     verifyCooldown: (duration) => `⏳ 验证冷却中，还需等待 ${duration}`,
-    verifyLinkGenerated: (userId, link, minutes, attemptsRemaining) => {
-      const attemptsMsg =
-        attemptsRemaining !== undefined
-          ? `\n💡 剩余尝试次数：${attemptsRemaining}/3（每小时）`
-          : "";
-      return `✅ 验证链接已生成\n\n用户 ID: ${userId}\n链接：${link}\n\n⏱️ 链接将在 ${minutes} 分钟后过期${attemptsMsg}`;
-    },
-    verifyLinkSentToUser: (userId, minutes) =>
-      `🔒 管理员要求您进行人机验证\n\n请点击下方链接完成验证：\n\n⏱️ 链接将在 ${minutes} 分钟后过期`,
-    verifySendFailed: "❌ 发送验证链接失败，请检查用户 ID",
+    verifyChallengeSent: (userId) => `✅ 已向用户 ${userId} 发送验证题目`,
+    verifySendFailed: "❌ 发送验证题目失败，请检查用户 ID",
     reverifyCleared: (userId) =>
       `✅ 已清除用户 ${userId} 的验证状态\n用户下次发送消息时需要重新验证`,
     reverifyFailed: "❌ 操作失败，请检查用户 ID",
     resetVerificationDone: (userId) =>
-      `✅ 已重置用户 ${userId} 的验证限制\n用户可以立即请求新的验证链接`,
+      `✅ 已重置用户 ${userId} 的验证限制\n用户可以立即请求新的验证题目`,
     resetVerificationFailed: "❌ 操作失败，请检查用户 ID",
 
     // User check
@@ -316,9 +307,9 @@ export const zh: Messages = {
 
 注意：管理员回复可能不会立即到达，请耐心等待。`,
 
-    verificationPending: `⏳ 您的验证链接仍然有效
+    verificationPending: `⏳ 您的验证题目仍然有效
 
-请检查之前发送给您的验证链接并完成人机验证。
+请检查之前发送给您的验证题目并完成人机验证。
 
 如果链接已过期，请稍后重试。`,
 
@@ -402,12 +393,6 @@ export const zh: Messages = {
       },
     ],
 
-    // Turnstile
-    turnstileMessage: (minutes) =>
-      `🔒 首次使用需要进行人机验证\n\n⏱️ 链接将在 ${minutes} 分钟后过期`,
-    turnstileButton: "🔐 点击进行验证",
-    turnstileChallenge: "请完成 Cloudflare Turnstile 验证",
-
     // AI
     aiQuestion: (question) => `🤖 请回答以下问题：\n\n${question}`,
     aiPrompt: `生成一个简单的常识性问题用于验证用户是真人。
@@ -446,17 +431,6 @@ export const zh: Messages = {
     errorRetry: "🔄 请重新发送消息获取新的验证题目",
     errorProcessing: "❌ 验证处理失败，请稍后重试",
 
-    // Link verification (web page)
-    linkInvalid:
-      "<h1>❌ 验证链接无效</h1>\n<p>该验证链接不存在或已被使用。</p>\n<p>请重新向机器人发送消息获取新的验证链接。</p>",
-    linkAlreadyVerified:
-      "<h1>✅ 您已完成验证</h1>\n<p>您的账号已经验证通过，可以直接使用机器人。</p>",
-    linkExpired:
-      "<h1>⏰ 验证链接已过期</h1>\n<p>该验证链接已过期，请重新向机器人发送消息获取新的验证链接。</p>",
-    linkPageFailed: "<h1>❌ 验证页面加载失败</h1>",
-    linkMissingToken: "缺少验证 token",
-    linkVerifyFailed: "人机验证失败，请重试",
-    linkServerError: "服务器错误",
   },
 
   // Rate limit messages
@@ -519,7 +493,6 @@ export const zh: Messages = {
   // Config service messages
   config: {
     dbOperationFailed: "数据库操作失败",
-    missingTurnstile: "缺少 Turnstile 配置",
     missingAI: "缺少 AI 验证配置",
     unknownMethod: "未知的验证方式",
   },
@@ -538,8 +511,8 @@ export const zh: Messages = {
     userAlreadyVerified: "用户已验证",
     cooldownMessage: (duration) => `验证冷却中，还需等待 ${duration}`,
     limitReached: "验证次数已达上限（3次/小时）",
-    invalidLink: "无效的验证链接",
-    linkExpired: "验证链接已过期，请重新获取",
+    invalidLink: "无效的验证题目",
+    linkExpired: "验证题目已过期，请重新获取",
   },
 
   // Duration format
@@ -569,7 +542,6 @@ export const zh: Messages = {
     none: "无验证",
     math: "算术题验证",
     quiz: "题库问答",
-    turnstile: "Cloudflare Turnstile",
     ai: "AI 智能验证",
   },
 

@@ -1,17 +1,11 @@
-export type VerificationMethod = "none" | "math" | "quiz" | "turnstile" | "ai";
+export type VerificationMethod = "none" | "math" | "quiz" | "ai";
 
 export interface VerificationConfig {
   enabled: boolean;
   method: VerificationMethod;
   timeout: number;
-  turnstile?: {
-    siteKey: string;
-    secretKey?: string; // 从环境变量补充
-  };
   ai?: {
-    baseUrl: string;
     model: string;
-    apiKey?: string; // 从环境变量补充
   };
 }
 

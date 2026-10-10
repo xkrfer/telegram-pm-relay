@@ -6,11 +6,10 @@ import { z } from "zod";
 export interface Env {
   // D1 Database binding
   DB: D1Database;
+  AI?: Ai;
 
   // Secrets (set via wrangler secret)
   BOT_TOKEN: string;
-  CLOUDFLARE_TURNSTILE_SECRET_KEY?: string;
-  AI_VERIFICATION_API_KEY?: string;
 
   // Environment variables (in wrangler.jsonc vars)
   BOT_SECRET: string;
@@ -30,9 +29,6 @@ export interface Env {
   RATE_LIMIT_PENALTY_DURATION: string;
   VERIFICATION_REQUIRED: string;
   VERIFICATION_TIMEOUT: string;
-  VERIFICATION_BASE_URL: string;
-  CLOUDFLARE_TURNSTILE_SITE_KEY: string;
-  AI_VERIFICATION_BASE_URL: string;
   AI_VERIFICATION_MODEL: string;
 }
 
@@ -92,15 +88,8 @@ const envSchema = z.object({
     .string()
     .default("900")
     .transform((val) => parseInt(val)),
-  VERIFICATION_BASE_URL: z.string().url(),
-  CLOUDFLARE_TURNSTILE_SITE_KEY: z.string().optional().default(""),
-  CLOUDFLARE_TURNSTILE_SECRET_KEY: z.string().optional().default(""),
-  AI_VERIFICATION_API_KEY: z.string().optional().default(""),
-  AI_VERIFICATION_BASE_URL: z
-    .string()
-    .optional()
-    .default("https://api.openai.com/v1"),
-  AI_VERIFICATION_MODEL: z.string().optional().default("gpt-4o-mini"),
+  AI: z.custom<Ai>((value) => value != null && typeof (value as Ai).run === "function").optional(),
+  AI_VERIFICATION_MODEL: z.literal("@cf/qwen/qwen3.8-27b").default("@cf/qwen/qwen3.8-27b"),
 });
 
 export type ParsedEnv = z.infer<typeof envSchema>;

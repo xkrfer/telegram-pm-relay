@@ -26,7 +26,7 @@
 - 🌍 **多语言支持** - 支持英文和中文界面
 
 ### 安全与防护
-- 🔒 **多种验证方式** - Math、Quiz、Turnstile、AI 四种验证方式
+- 🔒 **多种验证方式** - Math、Quiz、Cloudflare Workers AI 三种验证方式
 - 🛡️ **智能限流** - 多级限流策略，防止消息滥用
 - 🚫 **黑名单管理** - 支持导入/导出，临时/永久封禁
 - ⏰ **自动化任务** - Cron 定时清理过期数据
@@ -76,9 +76,6 @@ bun install
 ```bash
 # Bot Token
 npx wrangler secret put BOT_TOKEN
-
-# Turnstile Secret (可选)
-npx wrangler secret put CLOUDFLARE_TURNSTILE_SECRET_KEY
 ```
 
 3. **创建数据库**:
@@ -178,10 +175,10 @@ curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
 ### 验证管理
 ```
 /verification status            查看验证系统状态
-/verification set <方式>        设置验证方式 (math/quiz/turnstile/ai)
+/verification set <方式>        设置验证方式 (math/quiz/ai)
 /verification enable            启用验证系统
 /verification disable           禁用验证系统
-/verify <user_id>               发送验证链接给指定用户
+/verify <user_id>               发送验证题目给指定用户
 /reverify <user_id>             清除用户验证状态
 /reset-verification <user_id>   重置验证尝试次数
 ```
@@ -192,8 +189,11 @@ curl -X POST "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook" \
 |------|------|----------|--------|
 | **Math** | 简单算术题 | 无 | ⭐⭐⭐⭐⭐ |
 | **Quiz** | 内置题库问答 | 无 | ⭐⭐⭐⭐⭐ |
-| **Turnstile** | Cloudflare 人机验证 | Site Key + Secret Key | ⭐⭐⭐⭐ |
-| **AI** | AI 生成问题 | AI API Key | ⭐⭐ |
+| **AI** | AI 生成问题 | Cloudflare Workers AI 绑定 (`AI`) | ⭐⭐ |
+
+AI 出题直接使用 `wrangler.jsonc` 中的 `AI` 绑定（Cloudflare Workers AI），模型为 `@cf/qwen/qwen3.8-27b`，无需外部 API 地址或密钥。使用 `/verification set ai` 启用。生成失败时不会放行用户，请重试或切换为 math/quiz。
+
+升级时运行 `bun run db:migrations:apply`：旧 Turnstile 配置会切换为 math，旧网页验证会话将清除，已验证用户不受影响。旧 Turnstile 密钥、AI API 密钥/地址及 `VERIFICATION_BASE_URL` 不再使用。`/verify` 直接向用户发送 Telegram 按钮题目。Workers AI 本地开发也需要连接 Cloudflare 账号，会使用账号的 AI 配额。
 
 **切换验证方式：**
 ```bash

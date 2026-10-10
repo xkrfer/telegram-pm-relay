@@ -19,8 +19,9 @@
 		"RATE_LIMIT_PENALTY_DURATION": "60",
 		"VERIFICATION_REQUIRED": "true",
 		"VERIFICATION_TIMEOUT": "900",
-		"AI_VERIFICATION_MODEL": "google/gemini-2.5-flash"
+		"AI_VERIFICATION_MODEL": "@cf/qwen/qwen3.8-27b"
 	},
+	"ai": { "binding": "AI" },
 	"d1_databases": [
 		{
 			"binding": "DB",

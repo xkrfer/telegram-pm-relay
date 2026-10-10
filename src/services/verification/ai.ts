@@ -1,5 +1,3 @@
-import { generateText, Output } from "ai";
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { z } from "zod";
 import { BaseVerificationMethod } from "./base";
 import type { VerificationChallenge } from "../../types/verification";
@@ -15,15 +13,15 @@ import { getLang, getMessages } from "../../i18n";
  * Quiz schema for structured AI output
  */
 const quizSchema = z.object({
-  question: z.string().describe("A simple common-sense question"),
-  options: z.array(z.string()).length(4).describe("4 answer options"),
-  correct: z.number().min(0).max(3).describe("Index of correct answer (0-3)"),
+  question: z.string().trim().min(1).describe("A simple common-sense question"),
+  options: z.array(z.string().trim().min(1)).length(4).describe("4 answer options"),
+  correct: z.number().int().min(0).max(3).describe("Index of correct answer (0-3)"),
 });
 
 type Quiz = z.infer<typeof quizSchema>;
 
 /**
- * AI Verification using Vercel AI SDK
+ * AI Verification using Cloudflare Workers AI
  * Generates structured quiz data with type-safe output
  */
 export class AIVerification extends BaseVerificationMethod {
@@ -38,7 +36,7 @@ export class AIVerification extends BaseVerificationMethod {
     token: string
   ): Promise<VerificationChallenge> {
     try {
-      // Call AI SDK to generate structured quiz
+      // Call Workers AI to generate structured quiz
       const quiz = await this.generateAIQuiz(env);
 
       // Save verification data to database
@@ -77,35 +75,38 @@ export class AIVerification extends BaseVerificationMethod {
   }
 
   /**
-   * Generate structured quiz using AI SDK
+   * Generate structured quiz using Workers AI
    */
   private async generateAIQuiz(env: ParsedEnv): Promise<Quiz> {
-    if (!env.AI_VERIFICATION_API_KEY) {
-      throw new Error("AI_VERIFICATION_API_KEY not configured");
+    if (!env.AI) {
+      throw new Error("Workers AI binding not configured");
     }
 
     const lang = getLang(env);
     const m = getMessages(lang);
 
-    // Create OpenAI-compatible provider
-    const provider = createOpenAICompatible({
-      name: "ai-verification",
-      baseURL: env.AI_VERIFICATION_BASE_URL,
-      apiKey: env.AI_VERIFICATION_API_KEY,
-    });
-
     try {
       // Generate random seed to ensure different questions each time
       const randomSeed = Math.floor(Math.random() * 10000) + 1;
 
-      const { output: quiz } = await generateText({
-        model: provider.chatModel(env.AI_VERIFICATION_MODEL),
-        output: Output.object({ schema: quizSchema }),
-        system:
-          "You are a helpful assistant that generates simple quiz questions for human verification. Always generate a unique and creative question.",
-        prompt: `${m.verification.aiPrompt}\n\n[Seed: ${randomSeed}] Please generate a unique question that is different from typical examples.`,
+      const result = await env.AI.run(env.AI_VERIFICATION_MODEL, {
+        messages: [
+          { role: "system", content: "Generate a simple human verification quiz. Return only JSON with question, options (exactly four distinct strings), and correct (integer index 0-3)." },
+          { role: "user", content: `${m.verification.aiPrompt}\n[Seed: ${randomSeed}]` },
+        ],
+        response_format: { type: "json_schema", json_schema: z.toJSONSchema(quizSchema) },
+        max_tokens: 512,
         temperature: 0.8,
       });
+      if (!("response" in result) || result.response == null) {
+        throw new Error("Workers AI returned no quiz");
+      }
+      const quiz = quizSchema.parse(
+        typeof result.response === "string" ? JSON.parse(result.response) : result.response
+      );
+      if (new Set(quiz.options).size !== 4) {
+        throw new Error("Workers AI returned duplicate options");
+      }
 
       console.log("[AIVerification]", "AI quiz generated successfully", {
         question: quiz.question,

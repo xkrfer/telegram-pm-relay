@@ -37,10 +37,5 @@ jobs:
             {
               "BOT_TOKEN": "${{ secrets.BOT_TOKEN }}",
               "BOT_SECRET": "${{ secrets.BOT_SECRET }}",
-              "ADMIN_UID": "${{ secrets.ADMIN_UID }}",
-              "CLOUDFLARE_TURNSTILE_SITE_KEY": "${{ secrets.CLOUDFLARE_TURNSTILE_SITE_KEY }}",
-              "CLOUDFLARE_TURNSTILE_SECRET_KEY": "${{ secrets.CLOUDFLARE_TURNSTILE_SECRET_KEY }}",
-              "AI_VERIFICATION_API_KEY": "${{ secrets.AI_VERIFICATION_API_KEY }}",
-              "VERIFICATION_BASE_URL": "${{ secrets.VERIFICATION_BASE_URL }}",
-              "AI_VERIFICATION_BASE_URL": "${{ secrets.AI_VERIFICATION_BASE_URL }}"
+              "ADMIN_UID": "${{ secrets.ADMIN_UID }}"
             }

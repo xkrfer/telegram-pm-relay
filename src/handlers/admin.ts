@@ -29,7 +29,7 @@ import { configService } from "../services/config.service";
 import { filterService } from "../services/filter.service";
 import {
   getVerificationStatus,
-  createVerificationLink,
+  startVerification,
   canRequestVerification,
   recordVerificationAttempt,
 } from "../services/verification.service";
@@ -639,7 +639,7 @@ export async function handleAdminMessage(
   if (text.startsWith("/verification set ")) {
     const method = text.substring(18).trim() as VerificationMethod;
 
-    if (!["none", "math", "quiz", "turnstile", "ai"].includes(method)) {
+    if (!["none", "math", "quiz", "ai"].includes(method)) {
       await sendMessage(api, chatId, m.admin.verificationMethodInvalid, env);
       return;
     }
@@ -743,7 +743,7 @@ export async function handleAdminMessage(
     return;
   }
 
-  // /verify - Admin sends verification link to user
+  // /verify - Admin sends an inline verification challenge
   if (text.startsWith("/verify ")) {
     const targetIdStr = text.substring(8).trim();
 
@@ -794,35 +794,20 @@ export async function handleAdminMessage(
         return;
       }
 
-      // Generate verification link
-      const verifyLink = await createVerificationLink(db, env, targetId);
+      const config = await configService.getVerificationConfig(db, env);
+      if (!config.enabled || config.method === "none") {
+        await sendMessage(api, chatId, m.admin.verificationDisabled, env);
+        return;
+      }
+      const result = await startVerification(db, api, env, targetId, lang);
+      if (!result.success) {
+        await sendMessage(api, chatId, m.admin.verifySendFailed, env);
+        return;
+      }
       await recordVerificationAttempt(db, targetId);
+      await sendMessage(api, chatId, m.admin.verifyChallengeSent(targetId), env);
 
-      // Send to admin
-      await sendMessage(
-        api,
-        chatId,
-        m.admin.verifyLinkGenerated(
-          targetId,
-          verifyLink,
-          Math.floor(env.VERIFICATION_TIMEOUT / 60),
-          canVerify.attemptsRemaining
-        ),
-        env
-      );
-
-      // Send to user
-      await sendMessage(
-        api,
-        targetId,
-        m.admin.verifyLinkSentToUser(
-          targetId,
-          Math.floor(env.VERIFICATION_TIMEOUT / 60)
-        ) + `\n${verifyLink}`,
-        env
-      );
-
-      console.log("[AdminHandler]", "Admin sent verification link", {
+      console.log("[AdminHandler]", "Admin sent verification challenge", {
         userId: targetId,
         adminId: chatId,
       });

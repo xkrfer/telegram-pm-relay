@@ -39,28 +39,18 @@ class ConfigService {
     let config: VerificationConfig;
 
     if (dbConfig?.verification) {
-      // Database config exists, parse JSON and add sensitive info
+      // Normalize stored configuration; credentials are no longer needed.
       const verificationData =
         typeof dbConfig.verification === "string"
           ? JSON.parse(dbConfig.verification)
           : dbConfig.verification;
 
       config = {
-        ...verificationData,
-        // Add Turnstile secret key
-        turnstile: verificationData.turnstile
-          ? {
-              ...verificationData.turnstile,
-              secretKey: env.CLOUDFLARE_TURNSTILE_SECRET_KEY,
-            }
-          : undefined,
-        // Add AI API Key
-        ai: verificationData.ai
-          ? {
-              ...verificationData.ai,
-              apiKey: env.AI_VERIFICATION_API_KEY,
-            }
-          : undefined,
+        enabled: verificationData.enabled,
+        // Legacy web verification becomes an inline math challenge.
+        method: verificationData.method === "turnstile" ? "math" : verificationData.method,
+        timeout: verificationData.timeout,
+        ai: { model: env.AI_VERIFICATION_MODEL },
       };
     } else {
       // Database config doesn't exist, use environment variables as defaults
@@ -226,38 +216,14 @@ class ConfigService {
       case "quiz":
         return { valid: true };
 
-      case "turnstile":
-        const hasTurnstile =
-          env.CLOUDFLARE_TURNSTILE_SITE_KEY &&
-          env.CLOUDFLARE_TURNSTILE_SECRET_KEY;
-
-        if (!hasTurnstile) {
-          return {
-            valid: false,
-            error: m.config.missingTurnstile,
-            missing: [
-              "CLOUDFLARE_TURNSTILE_SITE_KEY",
-              "CLOUDFLARE_TURNSTILE_SECRET_KEY",
-            ],
-          };
-        }
-        return { valid: true };
-
       case "ai":
-        const hasAI =
-          env.AI_VERIFICATION_API_KEY &&
-          env.AI_VERIFICATION_BASE_URL &&
-          env.AI_VERIFICATION_MODEL;
+        const hasAI = env.AI && env.AI_VERIFICATION_MODEL;
 
         if (!hasAI) {
           return {
             valid: false,
             error: m.config.missingAI,
-            missing: [
-              "AI_VERIFICATION_API_KEY",
-              "AI_VERIFICATION_BASE_URL",
-              "AI_VERIFICATION_MODEL",
-            ],
+            missing: ["AI", "AI_VERIFICATION_MODEL"],
           };
         }
         return { valid: true };
@@ -285,20 +251,7 @@ class ConfigService {
         timeout: env.VERIFICATION_TIMEOUT,
       };
 
-      // If environment has Turnstile config, record Site Key
-      if (env.CLOUDFLARE_TURNSTILE_SITE_KEY) {
-        defaultConfig.turnstile = {
-          siteKey: env.CLOUDFLARE_TURNSTILE_SITE_KEY,
-        };
-      }
-
-      // If environment has AI config, record it
-      if (env.AI_VERIFICATION_API_KEY) {
-        defaultConfig.ai = {
-          baseUrl: env.AI_VERIFICATION_BASE_URL,
-          model: env.AI_VERIFICATION_MODEL,
-        };
-      }
+      defaultConfig.ai = { model: env.AI_VERIFICATION_MODEL };
 
       await db.insert(systemConfig).values({
         verification: JSON.stringify(defaultConfig),

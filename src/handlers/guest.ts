@@ -106,12 +106,6 @@ export async function handleGuestMessage(
 
     // If has active verification link
     if (verifyStatus.hasActiveLink) {
-      // For Turnstile (Web verification), prompt user to use previous link
-      if (config.method === "turnstile") {
-        await sendMessage(api, chatId, m.user.verificationPending, env);
-        return;
-      }
-
       // For inline verification (Math/Quiz/AI), allow restart
       // Clear old verification data
       await db

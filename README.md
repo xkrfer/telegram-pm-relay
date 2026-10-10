@@ -26,7 +26,7 @@ Supports multiple verification methods, intelligent rate limiting, blocklist man
 - 🌍 **Multi-language Support** - English and Chinese interface
 
 ### Security & Protection
-- 🔒 **Multiple Verification Methods** - Math, Quiz, Turnstile, AI verification
+- 🔒 **Multiple Verification Methods** - Math, Quiz, Cloudflare Workers AI verification
 - 🛡️ **Intelligent Rate Limiting** - Multi-tier rate limiting strategies
 - 🚫 **Blocklist Management** - Import/export, temporary/permanent bans
 - ⏰ **Automated Tasks** - Cron job for cleaning expired data
@@ -76,9 +76,6 @@ bun install
 ```bash
 # Bot Token
 npx wrangler secret put BOT_TOKEN
-
-# Turnstile Secret (optional)
-npx wrangler secret put CLOUDFLARE_TURNSTILE_SECRET_KEY
 ```
 
 3. **Create Database**:
@@ -178,10 +175,10 @@ Reply to user message        Direct reply to forwarded messages
 ### Verification Management
 ```
 /verification status            View verification system status
-/verification set <method>      Set verification method (math/quiz/turnstile/ai)
+/verification set <method>      Set verification method (math/quiz/ai)
 /verification enable            Enable verification system
 /verification disable           Disable verification system
-/verify <user_id>               Send verification link to user
+/verify <user_id>               Send verification challenge to user
 /reverify <user_id>             Clear user verification status
 /reset-verification <user_id>   Reset verification attempt count
 ```
@@ -192,8 +189,11 @@ Reply to user message        Direct reply to forwarded messages
 |--------|-------------|--------------|-------------|
 | **Math** | Simple arithmetic | None | ⭐⭐⭐⭐⭐ |
 | **Quiz** | Built-in quiz bank | None | ⭐⭐⭐⭐⭐ |
-| **Turnstile** | Cloudflare CAPTCHA | Site Key + Secret Key | ⭐⭐⭐⭐ |
-| **AI** | AI-generated questions | AI API Key | ⭐⭐ |
+| **AI** | AI-generated questions | Cloudflare Workers AI binding (`AI`) | ⭐⭐ |
+
+AI questions use the `AI` binding in `wrangler.jsonc` (Cloudflare Workers AI), with `@cf/qwen/qwen3.8-27b`. No external API URL or key is required. Enable with `/verification set ai`. Generation failures do not verify users; retry or switch to math/quiz.
+
+On upgrade, run `bun run db:migrations:apply`: legacy Turnstile configuration becomes math and old web sessions are cleared; verified users remain verified. Old Turnstile secrets, AI API credentials/URLs, and `VERIFICATION_BASE_URL` are unused. `/verify` sends a Telegram button challenge directly. Local Workers AI development requires a connected Cloudflare account and uses its AI quota.
 
 **Switch verification method:**
 ```bash
