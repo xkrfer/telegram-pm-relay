@@ -86,13 +86,48 @@ export class AIVerification extends BaseVerificationMethod {
     const m = getMessages(lang);
 
     try {
-      // Generate random seed to ensure different questions each time
-      const randomSeed = Math.floor(Math.random() * 10000) + 1;
+      // Vary the actual subject and reasoning task, not just an opaque seed.
+      // This reduces repetition without storing question history.
+      const topics = [
+        "kitchen utensils", "food storage", "clothing and weather",
+        "household cleaning", "bathroom objects", "school supplies",
+        "public transport", "pedestrian safety", "shopping and packaging",
+        "gardening", "pet care", "sports equipment", "everyday tools",
+        "furniture", "personal hygiene", "recycling", "lighting",
+        "rainy-day activities", "travel supplies", "simple cooking",
+        "musical instruments", "measuring everyday objects", "sleep and rest",
+        "common materials", "playground activities", "laundry",
+        "communication devices", "organizing belongings", "drinking water",
+        "opening and closing containers", "plant care", "library activities",
+      ];
+      const angles = [
+        "choose the object suitable for a specific task",
+        "identify an object's everyday purpose",
+        "choose the sensible next step in a short situation",
+        "identify a directly observable property",
+        "predict a simple everyday cause and effect",
+        "choose the appropriate place to keep or use an object",
+        "match an object to a common activity",
+        "identify which item belongs to an everyday category",
+      ];
+      const random = crypto.getRandomValues(new Uint32Array(3));
+      const diversityPrompt = [
+        `Topic: ${topics[random[0] % topics.length]}.`,
+        `Question angle: ${angles[random[1] % angles.length]}.`,
+        `Place the correct option at zero-based index ${random[2] % 4}.`,
+        `Generation time (UTC): ${new Date().toISOString()}.`,
+        `Variation ID: ${crypto.randomUUID()}.`,
+        "Invent a concrete, short everyday situation within the topic. Vary the object, action, wording and distractors.",
+        "Use the time and variation ID only as variation cues; never mention them or ask the user about them.",
+        "Avoid stock questions about sky color, sunrise direction, number of seasons or days in a week, falling objects, or which animal flies.",
+        "Keep one unambiguous answer. Avoid subjective preferences, regional customs, specialist knowledge and current events.",
+        `Write the question and all options in ${lang === "zh" ? "Simplified Chinese" : "English"}.`,
+      ].join("\n");
 
       const result = await env.AI.run(env.AI_VERIFICATION_MODEL, {
         messages: [
           { role: "system", content: "Generate a simple human verification quiz. Return only JSON with question, options (exactly four distinct strings), and correct (integer index 0-3)." },
-          { role: "user", content: `${m.verification.aiPrompt}\n[Seed: ${randomSeed}]` },
+          { role: "user", content: `${m.verification.aiPrompt}\n\n${diversityPrompt}` },
         ],
         response_format: {
           type: "json_schema",

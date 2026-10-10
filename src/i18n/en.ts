@@ -424,11 +424,9 @@ Requirements:
 3. Provide 4 options with only 1 correct answer
 4. The 3 wrong options should be obviously wrong but not absurd
 
-Example question types:
-- Color recognition ("What color is the sky usually?")
-- Animal characteristics ("Which animal can fly?")
-- Basic knowledge ("How many seasons are in a year?")
-- Simple physics ("Which direction do objects fall?")
+Create a concrete everyday situation using the topic and question angle supplied for this request.
+Vary objects, actions, situations and options instead of repeating stock quiz templates.
+Keep the question short, objective and unambiguous. Changing names or option order alone is not meaningful variety.
 
 Please return in JSON format with question, options (array of 4), and correct (index 0-3).`,
 
